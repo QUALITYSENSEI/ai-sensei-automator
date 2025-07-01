@@ -592,7 +592,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_project_role: {
+        Args: { project_uuid: string; user_uuid: string }
+        Returns: string
+      }
     }
     Enums: {
       bug_severity: "critical" | "high" | "medium" | "low"
