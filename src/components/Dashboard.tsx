@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,9 +10,7 @@ import {
   Play, 
   Bug, 
   FileText, 
-  Users, 
   BarChart3, 
-  Plus, 
   Settings,
   LogOut,
   Brain,
@@ -21,6 +18,7 @@ import {
   Globe
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import ProjectCreation from './ProjectCreation';
 
 interface Project {
   id: string;
@@ -28,6 +26,7 @@ interface Project {
   description: string;
   status: string;
   created_at: string;
+  app_url?: string;
 }
 
 interface DashboardStats {
@@ -57,14 +56,24 @@ const Dashboard = () => {
 
   const loadDashboardData = async () => {
     try {
-      // Load projects
+      console.log('Loading dashboard data for user:', user?.id);
+      
+      // Load projects where user is a member
       const { data: projectsData, error: projectsError } = await supabase
         .from('projects')
-        .select('*')
+        .select(`
+          *,
+          project_members!inner(user_id)
+        `)
+        .eq('project_members.user_id', user?.id)
         .order('created_at', { ascending: false });
 
-      if (projectsError) throw projectsError;
+      if (projectsError) {
+        console.error('Projects error:', projectsError);
+        throw projectsError;
+      }
 
+      console.log('Projects loaded:', projectsData);
       setProjects(projectsData || []);
       
       // Load stats (simplified for now)
@@ -76,6 +85,7 @@ const Dashboard = () => {
       });
 
     } catch (error: any) {
+      console.error('Error loading dashboard:', error);
       toast({
         variant: "destructive",
         title: "Error loading dashboard",
@@ -87,7 +97,20 @@ const Dashboard = () => {
   };
 
   const handleSignOut = async () => {
-    await signOut();
+    try {
+      await signOut();
+      toast({
+        title: "Signed out successfully",
+        description: "You have been signed out of Quality Sensei.",
+      });
+    } catch (error: any) {
+      console.error('Sign out error:', error);
+      toast({
+        variant: "destructive",
+        title: "Error signing out",
+        description: error.message,
+      });
+    }
   };
 
   if (loading) {
@@ -188,10 +211,7 @@ const Dashboard = () => {
           <TabsContent value="projects" className="space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold text-slate-900">Your Projects</h2>
-              <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700">
-                <Plus className="h-4 w-4 mr-2" />
-                New Project
-              </Button>
+              <ProjectCreation onProjectCreated={loadDashboardData} />
             </div>
             
             {projects.length === 0 ? (
@@ -200,10 +220,7 @@ const Dashboard = () => {
                   <TestTube className="h-12 w-12 text-slate-400 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-slate-900 mb-2">No Projects Yet</h3>
                   <p className="text-slate-600 mb-4">Create your first testing project to get started with Quality Sensei</p>
-                  <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Project
-                  </Button>
+                  <ProjectCreation onProjectCreated={loadDashboardData} />
                 </CardContent>
               </Card>
             ) : (
@@ -218,6 +235,14 @@ const Dashboard = () => {
                         </Badge>
                       </div>
                       <CardDescription>{project.description}</CardDescription>
+                      {project.app_url && (
+                        <div className="text-sm text-blue-600 hover:text-blue-800">
+                          <a href={project.app_url} target="_blank" rel="noopener noreferrer" className="flex items-center">
+                            <Globe className="h-4 w-4 mr-1" />
+                            View App
+                          </a>
+                        </div>
+                      )}
                     </CardHeader>
                     <CardContent>
                       <div className="flex justify-between items-center text-sm text-slate-600">
